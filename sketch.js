@@ -11,6 +11,7 @@ let uppereffortStill;
 let lowereffortMoving;
 let lowereffortStill;
 let head
+let zone1, zone2, zone3
 
 let wristLeft
 let wristRight
@@ -87,7 +88,8 @@ function preload() {
 
 }
 
-document.body.style.filter = "grayscale(1)"
+//document.body.style.filter = "grayscale(1)"
+document.body.style.transform = "scaleX(-1)"
 
 function setup() {
   createCanvas(window.innerWidth, window.innerHeight);
@@ -114,6 +116,7 @@ function modelReady() {
 function gotPoses(poses) {
   if (poses.length > 0) {
     //image(video, 0, 0)
+    background(0, 30)
     keypoints = [];
     skeleton = [];
 
@@ -168,6 +171,13 @@ function trackUpperBody() {
   let c_wristRight = getkeypointbyname(keypoints[0], 'rightWrist');
   let c_shoulderRight = getkeypointbyname(keypoints[0], 'rightShoulder');
   let c_shoulderLeft = getkeypointbyname(keypoints[0], 'leftShoulder');
+
+  let c_ankleLeft = getkeypointbyname(keypoints[0], 'leftAnkle');
+  let c_ankleRight = getkeypointbyname(keypoints[0], 'rightAnkle');
+
+  let c_kneeLeft = getkeypointbyname(keypoints[0], 'leftKnee');
+  let c_kneeRight = getkeypointbyname(keypoints[0], 'rightKnee');
+
   let c_nose = getkeypointbyname(keypoints[0], 'nose');
 
   addToArray(c_nose, o_nose)
@@ -176,11 +186,12 @@ function trackUpperBody() {
   addToArray(c_shoulderRight, o_shoulderRight)
   addToArray(c_shoulderLeft, o_shoulderLeft)
 
-  if (c_nose) {
-    let a_nose = averagePositions(o_nose)
-    drawKeypoint(a_nose)
-    image(head, a_nose.x - head.width / 2, a_nose.y - head.height / 2);
-  }
+  addToArray(c_ankleRight, o_ankleRight)
+  addToArray(c_ankleLeft, o_ankleLeft)
+
+  addToArray(c_kneeRight, o_kneeRight)
+  addToArray(c_kneeLeft, o_kneeLeft)
+
 
   let wrist_dist = 0
 
@@ -192,25 +203,85 @@ function trackUpperBody() {
     let dist_right = movementOfPositions(o_wristRight)
     wrist_dist = (dist_left + dist_right) / 2
 
-    drawKeypoint(a_wristLeft, dist_left)
-    drawKeypoint(a_wristRight, dist_right)
+    drawKeypoint(a_wristLeft)
+    drawKeypoint(a_wristRight)
   }
 
+  let a_ankleLeft
+  let a_ankleRight
+  if (c_ankleLeft && c_ankleRight) {
+    a_ankleLeft = averagePositions(o_ankleLeft)
+    let dist_left = movementOfPositions(o_ankleLeft)
+
+    a_ankleRight = averagePositions(o_ankleRight)
+    let dist_right = movementOfPositions(o_ankleRight)
+
+    drawKeypoint(a_ankleLeft)
+    drawKeypoint(a_ankleRight)
+  }
+
+
+  let ratio
   if (c_shoulderLeft && c_shoulderRight) {
     let a_shoulderLeft = averagePositions(o_shoulderLeft, 10)
     let a_shoulderRight = averagePositions(o_shoulderRight, 10)
 
-    drawKeypoint(a_shoulderLeft)
-    drawKeypoint(a_shoulderRight)
+    // drawKeypoint(a_shoulderLeft)
+    // drawKeypoint(a_shoulderRight)
 
-    let w = a_shoulderLeft.x - a_shoulderRight.x
 
     let img = wrist_dist < 50 ? uppereffortStill : uppereffortMoving
-    let ratio = (w / img.width)
+    let lower_img = wrist_dist < 50 ? lowereffortStill : lowereffortMoving
+
+    let full_height = a_ankleLeft.y - a_shoulderLeft.y
+    let full_ratio = (full_height / lower_img.height)
+    let full_w = lower_img.width * full_ratio
+
+    let w = full_w
+    ratio = (w / img.width)
     let h = img.height * ratio
 
-    image(img, a_shoulderRight.x, a_shoulderRight.y, w, h)
+    let center = a_shoulderLeft.x + ((a_shoulderRight.x - a_shoulderLeft.x) / 2)
+    let x = center - (w / 2)
+
+    image(img, x, a_shoulderRight.y, w, h)
+    image(lower_img, x, a_shoulderRight.y, full_w, full_height)
   }
+
+  if (c_kneeLeft && c_kneeRight) {
+    let a_kneeLeft = averagePositions(o_kneeLeft)
+    let a_kneeRight = averagePositions(o_kneeRight)
+
+    let distance = abs(a_kneeRight.x - a_kneeLeft.x)
+
+    let img
+    if (distance < 150) {
+      img = zone1
+    }
+    else if (distance < 250) {
+      img = zone2
+    }
+    else {
+      img = zone3
+    }
+
+    let w = img.width * ratio
+    let h = img.height * ratio
+    let center = a_ankleLeft.x + ((a_ankleRight.x - a_ankleLeft.x) / 2)
+    let x = center - (w / 2)
+
+    image(img, x, a_ankleLeft.y, w, h)
+    // drawKeypoint(a_kneeLeft)
+    // drawKeypoint(a_kneeRight)
+  }
+
+
+  if (c_nose) {
+    let a_nose = averagePositions(o_nose)
+    drawKeypoint(a_nose)
+    image(head, (a_nose.x - (head.width * ratio) / 2), a_nose.y - (head.height * ratio) / 2, head.width * ratio, head.height * ratio);
+  }
+
 }
 
 /**
@@ -219,45 +290,9 @@ function trackUpperBody() {
  * @param {string} name 
  * */
 function drawKeypoint(position, size = 20, name = "") {
-  fill(255, 0, 0);
+  fill(255);
   ellipse(position.x, position.y, size, size); // Right wrist
 }
-
-function trackLowerBody() {
-  if (keypoints.length > 0) {
-    let currentkneeLeft = getkeypointbyname(keypoints[0], 'leftKnee');
-    let currentkneeRight = getkeypointbyname(keypoints[0], 'rightKnee');
-
-    if (currentkneeLeft && currentkneeRight) {
-      let leftmove = 0;
-      let rightmove = 0;
-
-      // Left knee calculating movement
-      if (o_kneeLeft) {
-        leftmove = calculateMovement(o_kneeLeft, currentkneeLeft.position);
-      }
-
-      // Right knee calculating movement
-      if (o_kneeRight) {
-        rightmove = calculateMovement(o_kneeRight, currentkneeRight.position);
-      }
-
-      let midX = (currentkneeLeft.position.x + currentkneeRight.position.x) / 2;
-      let midY = (currentkneeLeft.position.y + currentkneeRight.position.y) / 2;
-
-      fill(255, 255, 255);
-      noStroke();
-      ellipse(currentkneeLeft.position.x, currentkneeLeft.position.y, 20, 20); // Left knee
-
-      fill(255, 255, 255);
-      ellipse(currentkneeRight.position.x, currentkneeRight.position.y, 20, 20); // Right knee
-
-      o_kneeLeft = currentkneeLeft.position;
-      o_kneeRight = currentkneeRight.position;
-    }
-  }
-}
-
 
 function zones() {
   if (keypoints.length > 0) {
@@ -308,22 +343,6 @@ function distance(point_1, point_2) {
   var a = point_1.x - point_2.x;
   var b = point_1.y - point_2.y;
   return Math.sqrt(a * a + b * b);
-}
-
-function showupperbodyeffortimages(midX, midY, uppereffortimage) {
-  image(uppereffortimage, midX - uppereffortimage.width / 2, midY - uppereffortimage.height / 2, 400, 400);
-}
-
-function showlowerbodyeffortimages(midX, midY, lowereffortimage) {
-  image(lowereffortimage, midX - lowereffortimage.width / 2, midY - lowereffortimage.height / 2, 600, 600);
-}
-
-function showzoneimages(midX, midY, zoneimage) {
-  image(zoneimage, midX - zoneimage.width / 2, midY - zoneimage.height / 2, 600, 600);
-}
-
-function showhead(midX, midY, headimage) {
-  image(headimage, midX - headimage.width / 2, midY - headimage.height / 2, 600, 600);
 }
 
 function draw() {
